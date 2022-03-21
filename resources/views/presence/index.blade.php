@@ -11,6 +11,13 @@
         integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
 
     <title>Hello, world!</title>
+
+    <style>
+        canvas {
+            position: absolute;
+        }
+
+    </style>
 </head>
 
 <body>
@@ -91,7 +98,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="d-flex justify-content-center">
+                    <div class="d-flex justify-content-center" id="face-container">
                         <video id="video" width="720" height="560" autoplay muted></video>
                     </div>
 
@@ -108,14 +115,18 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous">
     </script>
+    <script src="{{ asset('js/face-api.min.js') }}"></script>
 
     <script>
         window.addEventListener('DOMContentLoaded', (event) => {
+
             const video = document.getElementById("video");
             const videoModalContainer = document.getElementById("videoModal");
-            const presenceButton = document.getElementById("presence")
+            const presenceButton = document.getElementById("presence");
+            const modalBody = document.getElementById('face-container');
 
             let videoStream;
+            let interval;
 
             var videoModal = new bootstrap.Modal(videoModalContainer, {
                 keyboard: false
@@ -133,13 +144,48 @@
                 video.srcObject = videoStream;
             });
 
-
             videoModalContainer.addEventListener('hidden.bs.modal', function(event) {
                 videoStream.getTracks().forEach(function(track) {
                     track.stop();
                 });
+                clearInterval(interval);
             });
 
+            Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
+                faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
+                faceapi.nets.faceRecognitionNet.loadFromUri("/models"),
+                faceapi.nets.faceExpressionNet.loadFromUri("/models"),
+            ]).then(() => {
+                video.addEventListener("play", () => {
+                    const canvas = faceapi.createCanvasFromMedia(video);
+                    modalBody.append(canvas);
+                    const displaySize = {
+                        width: video.width,
+                        height: video.height
+                    };
+                    faceapi.matchDimensions(canvas, displaySize);
+                    interval = setInterval(async () => {
+                        const detections = await faceapi
+                            .detectSingleFace(video, new faceapi
+                                .TinyFaceDetectorOptions())
+                            .withFaceLandmarks()
+                            .withFaceExpressions();
+                        const resizedDetections = faceapi.resizeResults(
+                            detections,
+                            displaySize
+                        );
+                        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas
+                            .height);
+                        faceapi.draw.drawDetections(canvas, resizedDetections);
+                        faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+                        faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
+                        // console.log(resizedDetections[0].expressions);
+                        // addExpressions(resizedDetections[0].expressions);
+                        console.log('test');
+                    }, 100);
+                });
+            });
         });
     </script>
 </body>
