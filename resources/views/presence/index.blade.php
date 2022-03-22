@@ -68,7 +68,17 @@
                         Datang
                     </div>
                     <ul class="list-group list-group-flush">
-                        <li class="list-group-item">-</li>
+                        <li class="list-group-item">
+                            @if (isset($presence))
+                                @if ($presence->arrive_time)
+                                    {{ $presence->arrive_time }}
+                                @else
+                                    -
+                                @endif
+                            @else
+                                -
+                            @endif
+                        </li>
                     </ul>
                 </div>
 
@@ -77,7 +87,17 @@
                         Pulang
                     </div>
                     <ul class="list-group list-group-flush">
-                        <li class="list-group-item">-</li>
+                        <li class="list-group-item">
+                            @if (isset($presence))
+                                @if ($presence->return_time)
+                                    {{ $presence->return_time }}
+                                @else
+                                    -
+                                @endif
+                            @else
+                                -
+                            @endif
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -151,6 +171,26 @@
                 clearInterval(interval);
             });
 
+            const expressionLists = [];
+
+            const addExpressions = (expressions) => {
+                const keys = Object.keys(expressions);
+
+                keys.forEach((key, index) => {
+                    const filteredItems = expressionLists.filter((item) => item == key);
+                    console.log(filteredItems);
+
+                    if (filteredItems.length == 0) {
+                        if (expressions[key] >= 0.9) {
+                            expressionLists.push(key);
+                        }
+                    }
+
+                    console.log(expressionLists);
+                });
+
+            };
+
             Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
                 faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
@@ -170,20 +210,55 @@
                             .detectSingleFace(video, new faceapi
                                 .TinyFaceDetectorOptions())
                             .withFaceLandmarks()
-                            .withFaceExpressions();
-                        const resizedDetections = faceapi.resizeResults(
-                            detections,
-                            displaySize
-                        );
-                        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas
-                            .height);
-                        faceapi.draw.drawDetections(canvas, resizedDetections);
-                        faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
-                        faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
-                        // console.log(resizedDetections[0].expressions);
-                        // addExpressions(resizedDetections[0].expressions);
-                        console.log('test');
-                    }, 100);
+                            .withFaceExpressions()
+                            .withFaceDescriptor();
+                        if (detections) {
+
+
+                            const image = await faceapi.fetchImage(
+                                `{{ asset(auth()->user()->image_url) }}`
+                            );
+
+                            const imageMatcher = await faceapi
+                                .detectSingleFace(image, new faceapi
+                                    .TinyFaceDetectorOptions())
+                                .withFaceLandmarks()
+                                .withFaceDescriptor();
+
+                            const faceMatcher = new faceapi.FaceMatcher(
+                                imageMatcher, 0.4
+                            );
+
+                            const result = faceMatcher.findBestMatch(
+                                detections.descriptor
+                            );
+
+                            console.log(result);
+
+                            const resizedDetections = faceapi.resizeResults(
+                                detections,
+                                displaySize
+                            );
+                            canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas
+                                .height);
+                            faceapi.draw.drawDetections(canvas, resizedDetections);
+                            faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+                            faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
+                            // console.log(resizedDetections[0].expressions);
+                            addExpressions(resizedDetections.expressions);
+
+                            console.log(result.label);
+                            console.log(expressionLists.length);
+
+                            if (expressionLists.length >= 3) {
+                                if (result.label != 'unknown') {
+                                    alert('berhasil');
+                                    window.location.href = "{{ url('presence') }}";
+                                }
+                            }
+                        }
+
+                    }, 500);
                 });
             });
         });

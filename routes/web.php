@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', [PresenceController::class, 'index'])->middleware(['auth']);
+Route::get('/presence', [PresenceController::class, 'presence']);
+
 
 Route::get('/dashboard', function () {
     return view('dashboard');
